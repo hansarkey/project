@@ -152,11 +152,11 @@ public class RestaurantNLG
 				String[] userprofile = new String[6];
 
 				System.out.println("Hi there, where are you located today?");
-				String city = scanner.next();
+				String city = scanner.nextLine();
 				userprofile[0] = city;
 
 				System.out.println("What type of cuisine would you like?");
-				String cuisine = scanner.next();
+				String cuisine = scanner.nextLine();
 				userprofile[1] = cuisine;
 
 				System.out.println("How much would you like to spend per person?");
@@ -182,33 +182,50 @@ public class RestaurantNLG
 				
 				double cosinesim = 0.0; 
 				double maxsim = 0.0;
-				int restaurantID = 0;
+				int restaurantID = -1;
 
 				//read in restaurant vectors and calculate similarity 	
 				try { 	
-						Scanner sc = new Scanner(new BufferedReader(new FileReader("/escnfs/home/hsarkey/cse40982/project/data/zomato_vectors2.txt")));
+						Scanner sc = new Scanner(new BufferedReader(new FileReader("data/zomato_vectors2.txt")));
 						int rows = 9550;
 						int columns = 6;
-			 			System.out.println("after scanner");
+			 			//System.out.println("after scanner");
 						String[][] restaurantVectors = new String[rows][columns];
 						while (sc.hasNextLine()) {
 								for (int i=0; i < restaurantVectors.length; i++) {
+                                                                                        double citySim = 0.0;
 											if (sc.hasNextLine()) {
 													String[] line = sc.nextLine().trim().split("--");
-													for (int j=0; j < line.length; j++) {
-														restaurantVectors[i][j] = line[j];
-													}
+                                                                                                        String[] v1 = new String[1];
+                                                                                                        String[] v2 = new String[1];
+                                                                                                        v1[0] = line[0];
+                                                                                                        v2[0] = userprofile[0];
+                                                                                                        citySim = cosineSimilarity(v1, v2);
+                                                                                                        if (Double.parseDouble(line[5]) < Double.parseDouble(userprofile[5])) {
+                                                                                                            continue;
+                                                                                                        }
+                                                                                                        if (citySim > 0.500) {
+													    for (int j=0; j < line.length; j++) {
+													    	restaurantVectors[i][j] = line[j];
+													    }
+                                                                                                        }
 											}
-											System.out.println(Arrays.toString(restaurantVectors[i]));
-											cosinesim  = cosineSimilarity(userprofile, restaurantVectors[i]);
-											if (cosinesim > maxsim) {
-													maxsim = cosinesim;
-													restaurantID = i;		
-											}
+                                                                                        if (citySim > 0.500) {
+                                                                                                        System.out.println(Arrays.toString(restaurantVectors[i]));
+                                                                                                        cosinesim  = cosineSimilarity(userprofile, restaurantVectors[i]);
+                                                                                                        if (cosinesim > maxsim) {
+                                                                                                            maxsim = cosinesim;
+                                                                                                            restaurantID = i;		
+                                                                                                        }
+                                                                                        }
 											
 								}
-								System.out.println(restaurantID);
-						}	
+								//System.out.println(restaurantID);
+						}
+                                                if (restaurantID == -1) {
+                                                    System.out.println("Could not find any restaurants meeting this criteria.\nTry picking a new city or lowering your rating\n");
+                                                    System.exit(3);
+                                                }
 				}
 				catch(FileNotFoundException ex)
 				{
@@ -216,7 +233,7 @@ public class RestaurantNLG
 						System.exit(2);
 				}
 			
-				RestaurantNLG restaurantNlg = new RestaurantNLG("/escnfs/home/hsarkey/cse40982/project/data/zomato_updated.csv");	
+				RestaurantNLG restaurantNlg = new RestaurantNLG("data/zomato_updated.csv");	
 			
 				System.out.println("How about this restaurant?"); 
 
