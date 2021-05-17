@@ -30,7 +30,7 @@ qs = []
 categories = [ 'rate:high', 'rate:low', 'accept']
                                     
 try:
-        datfile = open('/escnfs/home/hsarkey/cse40982/project/data/rateaccept.tsv', 'r')
+        datfile = open('rateaccept.tsv', 'r')
         lines = datfile.readlines()
         for entry in lines:
             qtypes.append(entry.split("\t")[0])
