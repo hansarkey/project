@@ -9,6 +9,7 @@ import java.util.Scanner;
 import java.util.Arrays;
 import java.util.Map.Entry;
 import java.lang.Object;
+import java.io.*;
 import java.io.Reader;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -51,16 +52,8 @@ public class RestaurantNLG
     {
         this.reader = new RestaurantEntryReader();
         this.reader.readRestaurantEntryFile(datfile);
-/*		
-				try { 
-						tok = KerasTokenizer.fromJson("/escnfs/home/hsarkey/cse40982/project/rate_tok.json");
-						String simpleMlp = "/escnfs/home/hsarkey/cse40982/project/rate_model.h5";
-						model = KerasModelImport.importKerasSequentialModelAndWeights(simpleMlp);
-				} catch (Exception e) {
-						e.printStackTrace();
-				} */
 		
-		}
+    }
 
     public List<String> realizeRestaurantById(int id)
 		{
@@ -113,24 +106,6 @@ public class RestaurantNLG
         
         return(allSentences);
     }
-/*
-		public List<String> askQuestion(String question, int planetid) 
-		{
-				PlanetEntry planet = this.reader.getPlanets().get(planetid);
-				
-				DocumentPlanner docplanner = new DocumentPlanner();
-				docplanner.createMessages(question, planet);
-			
-				List<Message> documentPlan = docplanner.getMessages();
-				//System.out.println("inside ask question");	
-
-				List<SPhraseSpec> sentences;
-				this.mp = new MicroPlanner();
-				sentences = mp.lexicalize(documentPlan);
-				//System.out.println("lexicalized");				 
-				Realizer realizer = new Realizer();
-				return(realizer.realize(sentences));
-		} */
 
 		public static int[] padcrop(Integer[][] seqp, int seqlen) {
 				int[] newseq = new int[seqlen];
@@ -162,8 +137,8 @@ public class RestaurantNLG
 					MultiLayerNetwork model = null;
 					
 					try {
-							tok = KerasTokenizer.fromJson("/escnfs/home/hsarkey/cse40982/project/rate_tok.json");
-							String simpleMlp = "/escnfs/home/hsarkey/cse40982/project/rate_model.h5";
+							tok = KerasTokenizer.fromJson("data/rate_tok.json");
+							String simpleMlp = "data/rate_model.h5";
 							model = KerasModelImport.importKerasSequentialModelAndWeights(simpleMlp);
 					} catch (Exception e) {
 							e.printStackTrace();
@@ -230,87 +205,291 @@ public class RestaurantNLG
 					}
 		}
 
+    public static float[] getEmbed(int index, String fileName)
+    {
+        float[] embed = new float[100];
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(fileName));
+            String strEmbedding = new String();
+            int newIndex = index * 4;
+            for (int i = 0; i <= newIndex; i++) {
+                String[] line = br.readLine().trim().split(":");
+                if (i == newIndex) {
+                    strEmbedding = line[0];
+                    break;
+                }
+            }
+
+            String[] stringArray = strEmbedding.split(" ");
+            for (int i = 0; i < stringArray.length; i++) {
+                embed[i] = Float.parseFloat(stringArray[i]);
+            }
+
+        }
+	catch(FileNotFoundException ex)
+	{
+	    System.out.println("An error occurred while retrieving the embeddings.");
+	    System.exit(2);
+	}
+        catch(IOException io)
+        {
+            System.out.println("IOException occured while retrieving the embeddings.");
+            System.exit(3);
+        }
+        return embed;
+    }
+    
+    public static int getRid(int id)
+    {
+        int rid = 0;
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("data/zomato_updated.csv"));
+            String strEmbedding = new String();
+            String line = br.readLine();
+            while ((line = br.readLine()) != null)
+            {
+                try {
+                    String[] rest = line.trim().split(",");
+                    if (Integer.parseInt(rest[0]) == id) {
+                        break;
+                    }
+                rid++;
+                } catch (NumberFormatException e){
+                    continue;
+                }
+            }
+        }
+	catch(FileNotFoundException ex)
+	{
+	    System.out.println("An error occurred while retrieving the rids.");
+	    System.exit(2);
+	}
+        catch(IOException io)
+        {
+            System.out.println("IOException occured while retrieving the rids.");
+            System.exit(3);
+        }
+        return rid;
+    }
+
+    public static float[] getCity(String response) 
+    {
+        KerasTokenizer tok = null;
+        MultiLayerNetwork model = null;
+        
+        try {
+            tok = KerasTokenizer.fromJson("data/cities.json");
+            String simpleMlp = "data/cities.h5";
+            model = KerasModelImport.importKerasSequentialModelAndWeights(simpleMlp);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } 
+                
+        response = response.replaceAll("[^a-zA-Z0-9]", " ");
+        response =  response.toLowerCase();
+        int seqlen = 200;
+        String[] responses = new String[1];
+        responses[0] = response;
+        Integer[][] seq = tok.textsToSequences(responses);
+                
+        int newseq[] = padcrop(seq,seqlen);
+        INDArray input = Nd4j.create(1, seqlen);
+        for(int i=0; i<seqlen; i++)
+        {   
+            input.putScalar(new int[] {i}, newseq[i]);
+        }
+        INDArray output = model.output(input);
+        double[] array = output.toDoubleVector();
+        double max = 0.0;
+        int decision = 0;
+        for (int i =0; i<array.length; i++) {
+            if (array[i] > max) {
+                max = array[i];
+                decision = i;
+            }
+        }
+
+        float[] cityEmbedding = getEmbed(decision, "data/city_samples.txt");
+
+        return cityEmbedding;
+
+    }
+
+    public static float[] getCuisine(String response) 
+    {
+        KerasTokenizer tok = null;
+        MultiLayerNetwork model = null;
+        
+        try {
+            tok = KerasTokenizer.fromJson("data/cuisine_tok.json");
+            String simpleMlp = "data/cuisines.h5";
+            model = KerasModelImport.importKerasSequentialModelAndWeights(simpleMlp);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } 
+                
+        response = response.replaceAll("[^a-zA-Z0-9]", " ");
+        response =  response.toLowerCase();
+        int seqlen = 200;
+        String[] responses = new String[1];
+        responses[0] = response;
+        Integer[][] seq = tok.textsToSequences(responses);
+                
+        int newseq[] = padcrop(seq,seqlen);
+        INDArray input = Nd4j.create(1, seqlen);
+        for(int i=0; i<seqlen; i++)
+        {   
+            input.putScalar(new int[] {i}, newseq[i]);
+        }
+        INDArray output = model.output(input);
+        double[] array = output.toDoubleVector();
+        double max = 0.0;
+        int decision = 0;
+        for (int i =0; i<array.length; i++) {
+            if (array[i] > max) {
+                max = array[i];
+                decision = i;
+            }
+        }
+
+        float[] cuisineEmbedding = getEmbed(decision, "data/cuisine_samples.txt");
+
+        return cuisineEmbedding;
+
+    }
+
+    public static float cosDistance(float[] v1, float[] v2)
+    {
+        float dotProduct = dotProduct(v1, v2);
+        float sumNorm = vectorNorm(v1) * vectorNorm(v2);
+        return dotProduct/sumNorm;
+    }
+    
+    public static float dotProduct(float[] v1, float[] v2) {
+        float result = 0;
+        for (int i = 0; i < v1.length; i++) {
+            result += v1[i] * v2[i];
+        }
+        return result;
+    }
+    
+    public static float vectorNorm(float[] v) {
+        float result = 0;
+        for (float aV:v) {
+            result += aV * aV;
+        }
+        result = (float) Math.sqrt(result);
+        return result;
+    }
+
     public static void main(String[] args)
     {
 				
 				Scanner scanner =  new Scanner(System.in);
+                                float[] userTotal = new float[104];
 				String[] userprofile = new String[6];
+                                float maxPrice = 800000;
 
 				System.out.println("Hi there, where are you located today?");
 				String city = scanner.nextLine();
-				userprofile[0] = city;
 
 				System.out.println("What type of cuisine would you like?");
 				String cuisine = scanner.nextLine();
 				userprofile[1] = cuisine;
 
+
 				System.out.println("How much would you like to spend per person?");
 				float avgprice = scanner.nextFloat();
-		//		avgprice = avgprice.replaceAll("[^0-9]+", " ");
-		//		System.out.println("after replaced");
-		//		System.out.println(avgprice);
-		//		float avgp = Float.parseFloat(avgprice); 
-				avgprice = (avgprice*2);
+				
+                                avgprice = (avgprice*2);
 				String price = String.valueOf(avgprice);
-				userprofile[2] = price;
+				userTotal[100] = avgprice/800000;
 
-				System.out.println("Would you like delivery?");
+				System.out.println("Would you like delivery? Yes or No");
 				String delivery = scanner.next();
-				userprofile[3] = delivery;
+                                if(delivery.toLowerCase() == "yes") {
+				    userTotal[101] = (float)1;
+                                } else {
+				    userTotal[101] = (float)0;
+                                }
 
 				System.out.println("Do you want to book in advance?");
 				String booking = scanner.next();
-				userprofile[4] = booking;
+                                if(booking.toLowerCase() == "yes") {
+				    userTotal[102] = (float)1;
+                                } else {
+				    userTotal[102] = (float)0;
+                                }
 
 				System.out.println("On a scale of 1.0 to 5.0, what is the minimum rating you would like your restaurant to have?");
 				float minrating = scanner.nextFloat();
-				String rating = String.valueOf(minrating);
-				userprofile[5] = rating; 
+                                userTotal[103] = minrating/5;
 
-				System.out.println(Arrays.toString(userprofile));
 				
-				double cosinesim = 0.0; 
+                                float[] cityEmbedding = getCity(city);
+                                float[] cuisineEmbedding = getCuisine(cuisine);
+                                for(int i = 0; i < cuisineEmbedding.length; i++) {
+                                    userTotal[i] = cuisineEmbedding[i];
+                                }
+                                double totalSim = 0.0;
+				double citySim = 0.0; 
+				double cuisineSim = 0.0; 
+                                double otherSim = 0.0;
 				double maxsim = 0.0;
-				int restaurantID = -1;
+				int rid = 0;
+                                int restaurantID = -1;
+
+                                float[] totalVector = new float[104];
+                                float[] otherVector = new float[4];
+                                float[] userOther = new float[4];
+                                double[] cosList = new double[5445];   // only considering city, and new delhi has most with 5445 cities
+                                int[] idList = new int[5445];       
 
 				//read in restaurant vectors and calculate similarity 	
 				try { 	
-						Scanner sc = new Scanner(new BufferedReader(new FileReader("data/zomato_vectors2.txt")));
-						int rows = 9550;
-						int columns = 6;
-			 			//System.out.println("after scanner");
-						String[][] restaurantVectors = new String[rows][columns];
+						Scanner sc = new Scanner(new BufferedReader(new FileReader("data/zomato_vectors3.txt")));
+                                                int i = 0;
+                                                String[] restaurantVectors = new String[9];
 						while (sc.hasNextLine()) {
-								for (int i=0; i < restaurantVectors.length; i++) {
-                                                                                        double citySim = 0.0;
-											if (sc.hasNextLine()) {
-													String[] line = sc.nextLine().trim().split("--");
-                                                                                                        String[] v1 = new String[1];
-                                                                                                        String[] v2 = new String[1];
-                                                                                                        v1[0] = line[0];
-                                                                                                        v2[0] = userprofile[0];
-                                                                                                        citySim = cosineSimilarity(v1, v2);
-                                                                                                        if (Double.parseDouble(line[5]) < Double.parseDouble(userprofile[5])) {
-                                                                                                            continue;
-                                                                                                        }
-                                                                                                        if (citySim > 0.500) {
-													    for (int j=0; j < line.length; j++) {
-													    	restaurantVectors[i][j] = line[j];
-													    }
-                                                                                                        }
-											}
-                                                                                        if (citySim > 0.500) {
-                                                                                                        System.out.println(Arrays.toString(restaurantVectors[i]));
-                                                                                                        cosinesim  = cosineSimilarity(userprofile, restaurantVectors[i]);
-                                                                                                        if (cosinesim > maxsim) {
-                                                                                                            maxsim = cosinesim;
-                                                                                                            restaurantID = i;		
-                                                                                                        }
-                                                                                        }
-											
-								}
-								//System.out.println(restaurantID);
+					    	    if (sc.hasNextLine()) {
+							String[] line = sc.nextLine().trim().split(",");
+                                                        
+                                                        float[] v1 = new float[100];
+                                                        String[] nextNum = line[1].split(" ");
+                                                        for (int j = 0; j < nextNum.length; j++) {
+                                                            v1[j] = Float.parseFloat(nextNum[j]);
+                                                        }
+                                                        
+                                                        citySim = cosDistance(v1, cityEmbedding);
+                                                        if (Float.parseFloat(line[6]) < userTotal[103]) {
+                                                            continue;
+                                                        }
+
+                                                        if (citySim > 0.950) {
+                                                            nextNum = line[2].split(" ");
+                                                            for (int j = 0; j < nextNum.length; j++) {
+                                                                totalVector[j] = Float.parseFloat(nextNum[j]);
+                                                            }
+                                                            totalVector[100] = Float.parseFloat(line[3]);
+                                                            totalVector[101] = Float.parseFloat(line[4]);
+                                                            totalVector[102] = Float.parseFloat(line[5]);
+                                                            totalVector[103] = Float.parseFloat(line[6]);
+                                                            
+                                                            totalSim = cosDistance(totalVector, userTotal);
+                                                            cosList[i] = 2*citySim + totalSim;
+                                                            idList[i] = Integer.parseInt(line[0]);
+                                                            if (cosList[i] > maxsim) {
+                                                                maxsim = cosList[i];
+                                                                restaurantID = idList[i];
+                                                            }
+                                                            i++;
+                                                        }
+						    }
 						}
+
+                                                // Get the restaurant ID from file
+
+                                                
                                                 if (restaurantID == -1) {
                                                     System.out.println("Could not find any restaurants meeting this criteria.\nTry picking a new city or lowering your rating\n");
                                                     System.exit(3);
@@ -321,34 +500,37 @@ public class RestaurantNLG
 						System.out.println("An error occurred.");
 						System.exit(2);
 				}
-			
 				RestaurantNLG restaurantNlg = new RestaurantNLG("data/zomato_updated.csv");	
 			
-				//System.out.println("How about this restaurant?"); 
-
-				//List<String> describedRestaurant = restaurantNlg.realizeRestaurantById(restaurantID);
-				//System.out.println(describedRestaurant);
-			 		
-				//String userresponse = scanner.nextLine();
 				int decision = -1;
 				String userresponse = " ";
-				//interpretResponse(userresponse);
-				while (decision	!= 2) {
-						
-						System.out.println("Ok, how about this one?");
-						List<String> describedRestaurant = restaurantNlg.realizeRestaurantById(restaurantID);
-						System.out.println(describedRestaurant);
-						userresponse = scanner.nextLine();
-						decision = interpretResponse(userresponse);
+
+                                // weird bug where its asking about restaurant twice. 
+                                scanner.nextLine();
+				
+                                while (decision	!= 2) {
+                                    maxsim = 0;
+                                    int maxIndex = 0;
+                                    for(int i = 0; i < idList.length; i++) {
+                                        if (cosList[i] > maxsim) {
+                                            maxIndex = i;
+                                            maxsim = cosList[i];
+                                            restaurantID = idList[i];
+                                        }
+                                    }
+                                    if (maxsim == 0) {
+                                        System.out.println("\nThere are sadly no more suggestions for restaurants in your area.");
+                                        System.out.println("Please restart if you would like to see your options again.");
+                                        System.exit(0);
+                                    }
+                                    cosList[maxIndex] = 0;
+			            rid = getRid(restaurantID);
+				    System.out.println("Ok, how about this one?");
+				    List<String> describedRestaurant = restaurantNlg.realizeRestaurantById(rid);
+				    System.out.println(describedRestaurant);
+				    userresponse = scanner.nextLine();
+				    decision = interpretResponse(userresponse);
 				}
 				System.out.println("Enjoy your meal.");			
-				/*
-				while (!(describedRestaurant.get(0)).equals("Enjoy your meal.")) {
-								describedRestaurant = restaurantNlg.realizeRestaurantById(restu
-				*/ /*
-				for(String Sentence: describedRestaurant)
-				{
-						System.out.print(Sentence);
-				} */
 		}
 }
